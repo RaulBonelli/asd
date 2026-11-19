@@ -1,0 +1,596 @@
+First of all: you're not a Neanderthal. You're a JavaScript developer being forced to learn Python, Flask, HTTP, authentication, and asynchronous communication under the threat of academic damnation.
+
+But I think I know how to teach this.
+
+We're going to use **JavaScript as your reference point**, explain what each thing actually does, and then translate that understanding into Flask/Python.
+
+I want you to understand *why* things work, not memorize 15 Flask recipes and pray to the machine gods.
+
+# **1. Sessions — How does a website remember you?**
+
+Imagine this:
+
+You enter a website and log in.
+
+The website checks:
+
+- Is your username correct?
+- Is your password correct?
+
+If everything is correct, you're logged in.
+
+But here's the problem:
+
+**HTTP has no memory.**
+
+Every request is independent. The server doesn't automatically know that the person making request number 2 is the same person who made request number 1.
+
+Imagine walking into a store, telling the cashier your name, buying something, and then having to introduce yourself again every time you want another item.
+
+That's HTTP without sessions.
+
+## **The solution: Sessions**
+
+A session is basically the server remembering information about a visitor between requests.
+
+In Flask:
+
+```
+from flask import session@app.route("/login")def login():    session["user_id"] = 15    return "Logged in!"
+```
+
+What happened?
+
+1. A visitor accesses `/login`.
+2. Flask stores `user_id = 15` in their session.
+3. Subsequent requests can access that information.
+
+For example:
+
+```
+@app.route("/profile")def profile():    if "user_id" in session:        return "Welcome back!"    return "You are not logged in"
+```
+
+And to log out:
+
+```
+@app.route("/logout")def logout():    session.pop("user_id", None)    return "Logged out!"
+```
+
+Notice that `pop()` removes the value.
+
+### **But how does Flask recognize the visitor?**
+
+Flask uses a cookie in the browser.
+
+**How a session works**
+
+**Your browser**
+
+Stores a session cookie
+
+HTTP requests + cookie
+
+**Flask server**
+
+Verifies the signed session data
+
+Important detail: Flask's default session is stored in a signed cookie, not in a server-side session database. The user cannot modify it without invalidating its signature, but its contents aren't encrypted. Never put passwords or secrets in it.
+
+Also, Flask requires a secret key:
+
+```
+app.secret_key = "some-secret-key"
+```
+
+Without it, Flask cannot securely sign session cookies.
+
+**JavaScript comparison:** Think of sessions as a way of maintaining user state across multiple HTTP requests, rather than keeping a variable alive in your frontend.
+
+# **2. Requests — How does JavaScript talk to Flask?**
+
+This one is actually easier if you understand frontend/backend communication.
+
+Imagine you have a JavaScript website and a Flask server.
+
+Your JavaScript wants to retrieve a list of users.
+
+It needs to ask Flask:
+
+"Hey, can you give me the users?"
+
+That communication is an HTTP request.
+
+There are different types:
+
+| Method | Purpose              | Example         |
+| ------ | -------------------- | --------------- |
+| GET    | Retrieve information | Get users       |
+| POST   | Create information   | Create a user   |
+| PUT    | Update information   | Change a user   |
+| PATCH  | Partially update     | Change username |
+| DELETE | Delete information   | Delete a user   |
+
+You probably recognize these from CRUD.
+
+## **Flask side (backend)**
+
+```
+@app.route("/users", methods=["GET"])def get_users():    users = User.query.all()    return {        "users": [            {"id": user.id, "name": user.name}            for user in users        ]    }
+```
+
+This route retrieves all users and returns JSON.
+
+JSON is simply a format for exchanging data between applications.
+
+## **JavaScript side (frontend)**
+
+```
+fetch("/users")
+    .then(response => response.json())
+    .then(data => {
+        console.log(data);
+    });
+```
+
+Let's translate:
+
+- `fetch("/users")`: Ask Flask for `/users`.
+- `response.json()`: Convert the response body into JavaScript data.
+- `.then(data => ...)`: Do something with the received data.
+
+That's it.
+
+Your JavaScript asks. Flask answers.
+
+# **3. Asynchronous requests — The devil himself**
+
+This is probably the most important conceptual distinction.
+
+Let's imagine you have a website displaying a list of products.
+
+You click a button to load more products.
+
+There are two ways your website could behave.
+
+**Synchronous approach (conceptually):**
+
+1. You click the button.
+2. The browser waits for the server.
+3. The server responds.
+4. Your website continues.
+
+It's like ordering food and standing completely still until the kitchen finishes cooking.
+
+**Asynchronous approach:**
+
+1. You click the button.
+2. JavaScript sends a request.
+3. JavaScript continues doing other things.
+4. The server eventually responds.
+5. JavaScript processes the response.
+
+You order food, sit down, play on your phone, and get notified when it's ready.
+
+**The difference**
+
+**Blocking**
+
+Request
+
+Wait...
+
+Response
+
+**Non-blocking**
+
+Request
+
+Other code runs
+
+Response arrives
+
+## **The magic word:&#x20;**`fetch()`
+
+You already know this:
+
+```
+fetch("/users")
+```
+
+But here's something important:
+
+`fetch()` doesn't immediately give you the data.
+
+It gives you a **Promise**.
+
+A Promise is basically JavaScript saying:
+
+"I don't have the result yet, but I promise I'll give you an answer when the operation finishes."
+
+You can handle that with `.then()`:
+
+```
+fetch("/users")
+    .then(response => response.json())
+    .then(data => {
+        console.log(data);
+    });
+```
+
+Or with `async` and `await`:
+
+```
+async function getUsers() {
+
+    const response = await fetch("/users");
+
+    const data = await response.json();
+
+    console.log(data);
+}
+```
+
+Let's dissect this:
+
+| Code              | Meaning                                                                    |
+| ----------------- | -------------------------------------------------------------------------- |
+| `async`           | This function can use `await`.                                             |
+| `fetch()`         | Sends the request.                                                         |
+| `await`           | Waits for that operation to finish without blocking the JavaScript thread. |
+| `response`        | The HTTP response received from Flask.                                     |
+| `response.json()` | Reads and parses the response body as JSON.                                |
+| `data`            | The actual JavaScript object containing the data.                          |
+
+**A very important detail:** `await` waits for the operation inside its function, but it doesn't freeze the entire browser. Other JavaScript tasks can continue running.
+
+And no, `async` and `await` aren't exclusive to JavaScript. Python has them too, but Flask applications commonly use ordinary synchronous routes. For your exam, the important distinction is likely between asynchronous frontend requests using `fetch()` and normal Flask routes.
+
+# **4. How do I send information TO Flask?**
+
+So far, we've been retrieving information.
+
+But what if you want to create a user?
+
+Let's make a complete example.
+
+**JavaScript:**
+
+```
+async function createUser() {
+
+    const response = await fetch("/users", {
+
+        method: "POST",
+
+        headers: {
+            "Content-Type": "application/json"
+        },
+
+        body: JSON.stringify({
+            name: "John",
+            age: 20
+        })
+
+    });
+
+    const data = await response.json();
+
+    console.log(data);
+}
+```
+
+There are three new things here.
+
+**1.&#x20;**`method: "POST"`
+
+We're telling Flask that we want to create something.
+
+**2.&#x20;**`headers`
+
+We're telling Flask what kind of information we're sending.
+
+`application/json` means we're sending JSON.
+
+**3.&#x20;**`body`
+
+This is the actual information we're sending.
+
+`JSON.stringify()` converts a JavaScript object into a JSON string.
+
+Now, what happens in Flask?
+
+**Python:**
+
+```
+from flask import request, jsonify@app.route("/users", methods=["POST"])def create_user():    data = request.get_json()    name = data["name"]    age = data["age"]    return jsonify({        "message": "User created!",        "name": name    }), 201
+```
+
+Look at this:
+
+```
+data = request.get_json()
+```
+
+This is Flask retrieving the JSON sent by JavaScript.
+
+Think of it like:
+
+- JavaScript: `JSON.stringify()`
+- Flask: `request.get_json()`
+
+They are essentially doing opposite sides of the same exchange.
+
+**The complete communication**
+
+**JavaScript**
+
+`fetch("/users", { method: "POST", ... })`
+
+Sends the data
+
+HTTP + JSON
+
+**Flask**
+
+`request.get_json()`
+
+Receives the data
+
+**Database**
+
+`db.session.add(user)`
+
+`db.session.commit()`
+
+Stores the information
+
+One more thing: `201` is an HTTP status code.
+
+# **5. HTTP status codes — Flask's way of communicating results**
+
+Imagine Flask is answering your request.
+
+It doesn't just send data. It also tells you whether the operation succeeded.
+
+These are the ones I'd memorize for your exam:
+
+| Code | Meaning               | When to use                            |
+| ---- | --------------------- | -------------------------------------- |
+| 200  | OK                    | Successful request                     |
+| 201  | Created               | Successfully created something         |
+| 204  | No Content            | Successful operation, no response body |
+| 400  | Bad Request           | Invalid data sent                      |
+| 401  | Unauthorized          | Authentication required or invalid     |
+| 403  | Forbidden             | User lacks permission                  |
+| 404  | Not Found             | Resource doesn't exist                 |
+| 500  | Internal Server Error | Something broke on the server          |
+
+In Flask:
+
+```
+return jsonify({"message": "Created"}), 201
+```
+
+Or:
+
+```
+return jsonify({"error": "Not found"}), 404
+```
+
+The comma separates the response body from the status code.
+
+Remember: `404` doesn't mean your Python code is broken. It means the requested resource wasn't found.
+
+# **6. Authentication — How does a website know who you are?**
+
+This is where sessions finally make sense.
+
+Authentication is simply **proving your identity**.
+
+Authorization is **determining what you're allowed to do**.
+
+For example:
+
+- Authentication: Are you Sujiro?
+- Authorization: Are you allowed to delete this post?
+
+Let's build the logic.
+
+## **Step 1: Login**
+
+A user submits their credentials.
+
+```
+@app.route("/login", methods=["POST"])def login():    data = request.get_json()    username = data["username"]    password = data["password"]    user = User.query.filter_by(username=username).first()    if user and check_password_hash(user.password, password):        session["user_id"] = user.id        return jsonify({"message": "Logged in!"}), 200    return jsonify({"error": "Invalid credentials"}), 401
+```
+
+Don't worry about memorizing every line yet.
+
+Understand the sequence:
+
+1. Receive username and password.
+2. Search for the user in the database.
+3. Check whether the password is correct.
+4. If correct, save their ID in the session.
+5. If incorrect, return an error.
+
+Notice something?
+
+```
+session["user_id"] = user.id
+```
+
+That's the same session we learned earlier!
+
+We're essentially telling Flask:
+
+"This person has successfully authenticated. Remember their identity."
+
+Passwords should be stored as hashes, not plain text. That's why the example uses `check_password_hash()`.
+
+## **Step 2: Protected routes**
+
+Now imagine someone wants to access their profile.
+
+```
+@app.route("/profile")def profile():    if "user_id" not in session:        return jsonify({"error": "Not logged in"}), 401    return jsonify({"message": "Welcome!"}), 200
+```
+
+This is authentication in practice.
+
+The server checks whether the visitor has an authenticated session.
+
+If they do, they can access the route.
+
+If they don't, they get rejected.
+
+## **Step 3: Logout**
+
+```
+@app.route("/logout")def logout():    session.pop("user_id", None)    return jsonify({"message": "Logged out!"}), 200
+```
+
+We remove their identity from the session.
+
+They're no longer authenticated.
+
+**The authentication lifecycle**
+
+1. **Login**
+
+   User sends username and password.
+2. **Verification**
+
+   Flask checks credentials against the database.
+3. **Session creation**
+
+   Flask stores the user's ID in the session.
+4. **Authenticated requests**
+
+   Flask recognizes the user through their session cookie.
+5. **Logout**
+
+   Flask removes the session identity.
+
+# **7. The big picture: How everything connects**
+
+Let's imagine you're building a simple task manager.
+
+You have a frontend written in JavaScript, a Flask backend, and a database.
+
+Here's what happens when someone uses it:
+
+| Action                        | Technology           |
+| ----------------------------- | -------------------- |
+| User logs in                  | Authentication       |
+| Flask remembers the user      | Session              |
+| User requests their tasks     | GET request          |
+| JavaScript receives the tasks | Fetch + JSON         |
+| User creates a task           | POST request         |
+| Flask receives the task       | `request.get_json()` |
+| Flask saves the task          | ORM + database       |
+| JavaScript updates the page   | Asynchronous request |
+| User logs out                 | Session removal      |
+
+And that's practically the entire foundation of the exam topics you described.
+
+# **8. Let's see if your brain actually understood it**
+
+I don't want to give you 30 pages of theory and leave you unable to write a single route.
+
+Let's do a small diagnostic exercise. You answer, I'll correct your reasoning, and we'll gradually increase the difficulty.
+
+**Mini diagnostic**
+
+5/5 answered
+
+**1. A user logs in successfully. What does Flask store in the session?**
+
+Their entire database
+
+Their user ID
+
+Their password
+
+Their HTML page
+
+**Correct!**
+
+The user ID identifies the authenticated user. Flask uses it on subsequent requests.
+
+**2. What does fetch('/users') return immediately?**
+
+An array of users
+
+A Python list
+
+A Promise
+
+A Flask route
+
+**Correct!**
+
+Fetch returns a Promise that eventually resolves to a Response.
+
+**3. JavaScript sends JSON to Flask. How does Flask retrieve it?**
+
+request.get_json()
+
+JSON.stringify()
+
+session.get()
+
+User.query.all()
+
+**Correct answer: request.get_json()**
+
+request.get_json() parses the incoming JSON request body.
+
+**4. A user tries to access a protected route without logging in. Which status code makes sense?**
+
+200
+
+201
+
+401
+
+500
+
+**Correct!**
+
+401 indicates that valid authentication is missing.
+
+**5. What does await do in an async JavaScript function?**
+
+Freezes the entire browser
+
+Waits for a Promise to settle without blocking the JS thread
+
+Deletes the request
+
+Converts Python into JavaScript
+
+**Correct!**
+
+Await suspends the async function until the Promise settles, while other JavaScript work can continue.
+
+# **4/5**
+
+**Your result**
+
+Try again
+
+## **My recommendation for your remaining study time**
+
+Given that you already understand CRUD, routes and ORM, I'd prioritize:
+
+1. **Sessions and authentication:** Understand the relationship between `session`, `user_id`, login and logout.
+2. **Fetch and asynchronous requests:** Become comfortable writing GET and POST requests with `async/await`.
+3. **JSON communication:** Know `JSON.stringify()`, `response.json()` and `request.get_json()`.
+4. **Status codes:** Memorize 200, 201, 400, 401, 403 and 404.
+5. **Git:** Practice `add`, `commit` and `push` until you can do them without thinking.
+
+One last thing: your exam explicitly prohibits AI assistance, so use this explanation to study beforehand, not during the assessment.
+
+**I'd particularly recommend that next we build a tiny Flask login system together, with a JavaScript frontend, from an empty project.** That one exercise would connect sessions, authentication, fetch, asynchronous requests, JSON and status codes in a single practical example.
