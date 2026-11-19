@@ -1,0 +1,1058 @@
+# FLASK — GUIA DE CONSULTA
+## Desenvolvimento Web II — Aulas 9 a 15
+
+==================================================
+1. ESTRUTURA BÁSICA DO FLASK
+==================================================
+
+Criar uma aplicação:
+
+```python
+from flask import Flask
+
+app = Flask(__name__)
+
+app.secret_key = "chave-secreta"
+
+@app.route("/")
+def home():
+    return "Hello World!"
+
+if __name__ == "__main__":
+    app.run(debug=True)
+```
+
+CONCEITOS:
+- Flask: framework Python para aplicações web.
+- @app.route(): define uma rota.
+- def: define uma função.
+- return: devolve uma resposta ao navegador.
+- debug=True: ativa modo de depuração.
+
+==================================================
+2. ROTAS E MÉTODOS HTTP
+==================================================
+
+GET: buscar informações.
+POST: criar informações.
+PUT: atualizar um registro.
+PATCH: atualizar parcialmente.
+DELETE: excluir informações.
+
+Exemplo:
+
+```python
+@app.route("/usuarios", methods=["GET"])
+def listar_usuarios():
+    return "Lista de usuários"
+
+@app.route("/usuarios", methods=["POST"])
+def criar_usuario():
+    return "Usuário criado"
+```
+
+Uma rota pode aceitar vários métodos:
+
+```python
+@app.route("/usuarios/<int:id>", methods=["GET", "DELETE"])
+def usuario(id):
+    return f"Usuário {id}"
+```
+
+<int:id> transforma o parâmetro em inteiro.
+
+Outros conversores:
+- <string:nome>
+- <int:id>
+- <float:valor>
+- <path:caminho>
+
+==================================================
+3. ORM — OBJECT RELATIONAL MAPPING
+==================================================
+
+ORM permite manipular bancos de dados utilizando classes e objetos Python em vez de escrever SQL manualmente.
+
+Exemplo com Flask-SQLAlchemy:
+
+```python
+from flask_sqlalchemy import SQLAlchemy
+
+app.config["SQLALCHEMY_DATABASE_URI"] = "sqlite:///banco.db"
+
+db = SQLAlchemy(app)
+```
+
+CRIAR UMA TABELA:
+
+```python
+class Usuario(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    nome = db.Column(db.String(100), nullable=False)
+    email = db.Column(db.String(120), unique=True)
+```
+
+CONCEITOS:
+- db.Model: transforma a classe em uma tabela.
+- db.Column: define uma coluna.
+- db.Integer: tipo inteiro.
+- db.String: texto.
+- primary_key=True: chave primária.
+- nullable=False: campo obrigatório.
+- unique=True: impede valores duplicados.
+
+CRIAR AS TABELAS:
+
+```python
+with app.app_context():
+    db.create_all()
+```
+
+==================================================
+4. CRUD COM ORM
+==================================================
+
+CREATE — CRIAR:
+
+```python
+novo = Usuario(
+    nome="João",
+    email="joao@email.com"
+)
+
+db.session.add(novo)
+db.session.commit()
+```
+
+READ — LER:
+
+Buscar todos:
+
+```python
+usuarios = Usuario.query.all()
+```
+
+Buscar pelo ID:
+
+```python
+usuario = db.session.get(Usuario, id)
+```
+
+Buscar pelo primeiro resultado:
+
+```python
+usuario = Usuario.query.first()
+```
+
+Buscar por uma coluna:
+
+```python
+usuario = Usuario.query.filter_by(nome="João").first()
+```
+
+Buscar com condição:
+
+```python
+usuarios = Usuario.query.filter(
+    Usuario.id > 5
+).all()
+```
+
+UPDATE — ATUALIZAR:
+
+```python
+usuario = db.session.get(Usuario, id)
+
+if usuario:
+    usuario.nome = "Novo nome"
+    db.session.commit()
+```
+
+DELETE — EXCLUIR:
+
+```python
+usuario = db.session.get(Usuario, id)
+
+if usuario:
+    db.session.delete(usuario)
+    db.session.commit()
+```
+
+IMPORTANTE:
+- add(): adiciona um objeto à sessão do banco.
+- commit(): confirma as alterações no banco.
+- delete(): marca um objeto para exclusão.
+- all(): retorna todos os resultados.
+- first(): retorna o primeiro resultado ou None.
+- filter_by(): filtra por igualdade.
+- filter(): permite condições mais complexas.
+
+==================================================
+5. TEMPLATES — HTML COM JINJA2
+==================================================
+
+Templates permitem utilizar Python e dados do Flask dentro de páginas HTML.
+
+ESTRUTURA:
+
+```text
+projeto/
+    app.py
+    templates/
+        index.html
+        usuarios.html
+    static/
+        style.css
+        script.js
+```
+
+RENDERIZAR UMA PÁGINA:
+
+```python
+from flask import render_template
+
+@app.route("/")
+def home():
+    return render_template("index.html")
+```
+
+ENVIAR VARIÁVEIS PARA O HTML:
+
+```python
+@app.route("/perfil")
+def perfil():
+    nome = "João"
+
+    return render_template(
+        "perfil.html",
+        nome=nome
+    )
+```
+
+No HTML:
+
+```html
+<h1>Olá, {{ nome }}!</h1>
+```
+
+SINTAXE JINJA2:
+
+Exibir variável:
+
+```html
+{{ nome }}
+```
+
+Condição:
+
+```html
+{% if usuario %}
+    <p>Usuário encontrado</p>
+{% else %}
+    <p>Usuário não encontrado</p>
+{% endif %}
+```
+
+Repetição:
+
+```html
+{% for usuario in usuarios %}
+    <p>{{ usuario.nome }}</p>
+{% endfor %}
+```
+
+Comentários:
+
+```html
+{# Comentário Jinja #}
+```
+
+Herança de templates:
+
+Arquivo base.html:
+
+```html
+<!DOCTYPE html>
+<html>
+<body>
+
+    {% block conteudo %}
+    {% endblock %}
+
+</body>
+</html>
+```
+
+Arquivo index.html:
+
+```html
+{% extends "base.html" %}
+
+{% block conteudo %}
+    <h1>Página inicial</h1>
+{% endblock %}
+```
+
+IMPORTANTE:
+- {{ }}: exibe valores.
+- {% %}: executa estruturas de controle.
+- extends: herda outro template.
+- block: define uma área que pode ser sobrescrita.
+- url_for(): gera URLs para rotas ou arquivos estáticos.
+
+Exemplo de arquivo estático:
+
+```html
+<link rel="stylesheet"
+      href="{{ url_for('static', filename='style.css') }}">
+```
+
+==================================================
+6. SESSÕES — SESSION
+==================================================
+
+HTTP não mantém automaticamente a identidade do usuário entre requisições.
+
+Sessões permitem guardar informações associadas ao visitante.
+
+IMPORTAR:
+
+```python
+from flask import session
+```
+
+CONFIGURAR:
+
+```python
+app.secret_key = "minha-chave-secreta"
+```
+
+SALVAR INFORMAÇÃO:
+
+```python
+session["usuario_id"] = 10
+```
+
+LER INFORMAÇÃO:
+
+```python
+id = session.get("usuario_id")
+```
+
+VERIFICAR SE EXISTE:
+
+```python
+if "usuario_id" in session:
+    print("Usuário identificado")
+```
+
+REMOVER UMA INFORMAÇÃO:
+
+```python
+session.pop("usuario_id", None)
+```
+
+LIMPAR A SESSÃO:
+
+```python
+session.clear()
+```
+
+DIFERENÇA:
+- session["chave"] = valor: salva.
+- session.get("chave"): consulta.
+- session.pop(): remove uma chave.
+- session.clear(): remove todos os dados da sessão.
+
+IMPORTANTE:
+A sessão padrão do Flask utiliza um cookie assinado armazenado no navegador. Não é recomendável guardar senhas ou informações secretas nele.
+
+==================================================
+7. AUTENTICAÇÃO — LOGIN E LOGOUT
+==================================================
+
+Autenticação verifica a identidade do usuário.
+
+AUTENTICAÇÃO:
+"Quem é você?"
+
+AUTORIZAÇÃO:
+"O que você pode fazer?"
+
+EXEMPLO DE LOGIN:
+
+```python
+from flask import request, session, jsonify
+from werkzeug.security import check_password_hash
+
+@app.route("/login", methods=["POST"])
+def login():
+
+    dados = request.get_json()
+
+    email = dados.get("email")
+    senha = dados.get("senha")
+
+    usuario = Usuario.query.filter_by(
+        email=email
+    ).first()
+
+    if usuario and check_password_hash(
+        usuario.senha, senha
+    ):
+
+        session["usuario_id"] = usuario.id
+
+        return jsonify({
+            "mensagem": "Login realizado"
+        }), 200
+
+    return jsonify({
+        "erro": "Credenciais inválidas"
+    }), 401
+```
+
+CRIAR HASH DE SENHA:
+
+```python
+from werkzeug.security import generate_password_hash
+
+senha_hash = generate_password_hash("123456")
+```
+
+VERIFICAR SENHA:
+
+```python
+check_password_hash(senha_hash, "123456")
+```
+
+LOGOUT:
+
+```python
+@app.route("/logout")
+def logout():
+
+    session.pop("usuario_id", None)
+
+    return jsonify({
+        "mensagem": "Logout realizado"
+    }), 200
+```
+
+PROTEGER UMA ROTA:
+
+```python
+@app.route("/perfil")
+def perfil():
+
+    if "usuario_id" not in session:
+        return jsonify({
+            "erro": "Não autenticado"
+        }), 401
+
+    return jsonify({
+        "mensagem": "Acesso permitido"
+    }), 200
+```
+
+FLUXO DE AUTENTICAÇÃO:
+
+1. Usuário envia email e senha.
+2. Flask recebe os dados.
+3. Flask procura o usuário no banco.
+4. Flask verifica a senha.
+5. Se estiver correta, salva o ID na sessão.
+6. Nas próximas requisições, Flask verifica a sessão.
+7. Logout remove a identificação da sessão.
+
+==================================================
+8. REQUISIÇÕES HTTP — REQUEST
+==================================================
+
+O objeto request permite acessar informações enviadas pelo cliente ao Flask.
+
+IMPORTAR:
+
+```python
+from flask import request
+```
+
+RECEBER JSON:
+
+```python
+dados = request.get_json()
+```
+
+ACESSAR VALORES:
+
+```python
+nome = dados.get("nome")
+idade = dados.get("idade")
+```
+
+RECEBER FORMULÁRIO:
+
+```python
+nome = request.form.get("nome")
+```
+
+RECEBER PARÂMETROS DA URL:
+
+URL:
+```text
+/buscar?nome=Joao
+```
+
+Python:
+
+```python
+nome = request.args.get("nome")
+```
+
+DIFERENÇAS:
+
+- request.get_json(): recebe JSON.
+- request.form: recebe dados de formulários.
+- request.args: recebe parâmetros da URL.
+- request.method: informa o método HTTP.
+- request.files: acessa arquivos enviados.
+
+EXEMPLO:
+
+```python
+@app.route("/usuarios", methods=["POST"])
+def criar_usuario():
+
+    dados = request.get_json()
+
+    nome = dados.get("nome")
+
+    if not nome:
+        return jsonify({
+            "erro": "Nome obrigatório"
+        }), 400
+
+    return jsonify({
+        "nome": nome
+    }), 201
+```
+
+==================================================
+9. JSON — TROCA DE DADOS
+==================================================
+
+JSON é um formato de representação de dados utilizado na comunicação entre frontend e backend.
+
+JavaScript transforma objetos em JSON:
+
+```javascript
+const objeto = {
+    nome: "João",
+    idade: 20
+};
+
+const json = JSON.stringify(objeto);
+```
+
+JavaScript transforma JSON recebido em objeto:
+
+```javascript
+const objeto = JSON.parse(json);
+```
+
+No fetch, podemos utilizar:
+
+```javascript
+const dados = await response.json();
+```
+
+No Flask:
+
+```python
+dados = request.get_json()
+```
+
+RETORNAR JSON NO FLASK:
+
+```python
+from flask import jsonify
+
+return jsonify({
+    "mensagem": "Sucesso",
+    "id": 10
+})
+```
+
+==================================================
+10. FETCH — REQUISIÇÕES ASSÍNCRONAS
+==================================================
+
+fetch() permite que JavaScript faça requisições HTTP sem precisar recarregar a página.
+
+GET:
+
+```javascript
+async function buscarUsuarios() {
+
+    const response = await fetch("/usuarios");
+
+    const dados = await response.json();
+
+    console.log(dados);
+}
+```
+
+POST:
+
+```javascript
+async function criarUsuario() {
+
+    const response = await fetch("/usuarios", {
+
+        method: "POST",
+
+        headers: {
+            "Content-Type": "application/json"
+        },
+
+        body: JSON.stringify({
+            nome: "João",
+            email: "joao@email.com"
+        })
+
+    });
+
+    const dados = await response.json();
+
+    console.log(dados);
+}
+```
+
+DELETE:
+
+```javascript
+async function excluirUsuario(id) {
+
+    const response = await fetch(
+        `/usuarios/${id}`,
+        {
+            method: "DELETE"
+        }
+    );
+
+    const dados = await response.json();
+
+    console.log(dados);
+}
+```
+
+PUT:
+
+```javascript
+async function atualizarUsuario(id) {
+
+    const response = await fetch(
+        `/usuarios/${id}`,
+        {
+            method: "PUT",
+
+            headers: {
+                "Content-Type": "application/json"
+            },
+
+            body: JSON.stringify({
+                nome: "Novo nome"
+            })
+        }
+    );
+
+    const dados = await response.json();
+
+    console.log(dados);
+}
+```
+
+CONCEITOS IMPORTANTES:
+
+- fetch(): envia uma requisição.
+- async: permite utilizar await dentro da função.
+- await: espera a conclusão de uma Promise.
+- response: resposta recebida do servidor.
+- response.json(): converte o corpo JSON em objeto JavaScript.
+- JSON.stringify(): transforma objeto JavaScript em texto JSON.
+- headers: informa os metadados da requisição.
+- body: contém os dados enviados.
+
+IMPORTANTE:
+Uma requisição assíncrona permite que outras tarefas do navegador continuem enquanto a resposta não chega.
+
+VERIFICAR SE A RESPOSTA FOI BEM-SUCEDIDA:
+
+```javascript
+if (response.ok) {
+    console.log("Sucesso!");
+} else {
+    console.log("Erro!");
+}
+```
+
+response.ok é verdadeiro para códigos HTTP entre 200 e 299.
+
+==================================================
+11. ROTAS DE API
+==================================================
+
+Uma API permite que aplicações se comuniquem por meio de requisições e respostas.
+
+Uma API REST normalmente utiliza métodos HTTP para manipular recursos.
+
+EXEMPLO DE API CRUD:
+
+```python
+from flask import request, jsonify
+
+@app.route("/api/usuarios", methods=["GET"])
+def listar():
+
+    usuarios = Usuario.query.all()
+
+    resultado = []
+
+    for usuario in usuarios:
+        resultado.append({
+            "id": usuario.id,
+            "nome": usuario.nome
+        })
+
+    return jsonify(resultado), 200
+```
+
+CRIAR:
+
+```python
+@app.route("/api/usuarios", methods=["POST"])
+def criar():
+
+    dados = request.get_json()
+
+    if not dados or not dados.get("nome"):
+        return jsonify({
+            "erro": "Nome obrigatório"
+        }), 400
+
+    novo = Usuario(nome=dados["nome"])
+
+    db.session.add(novo)
+    db.session.commit()
+
+    return jsonify({
+        "mensagem": "Criado",
+        "id": novo.id
+    }), 201
+```
+
+ATUALIZAR:
+
+```python
+@app.route("/api/usuarios/<int:id>", methods=["PUT"])
+def atualizar(id):
+
+    usuario = db.session.get(Usuario, id)
+
+    if not usuario:
+        return jsonify({
+            "erro": "Não encontrado"
+        }), 404
+
+    dados = request.get_json()
+
+    usuario.nome = dados.get(
+        "nome",
+        usuario.nome
+    )
+
+    db.session.commit()
+
+    return jsonify({
+        "mensagem": "Atualizado"
+    }), 200
+```
+
+EXCLUIR:
+
+```python
+@app.route("/api/usuarios/<int:id>", methods=["DELETE"])
+def excluir(id):
+
+    usuario = db.session.get(Usuario, id)
+
+    if not usuario:
+        return jsonify({
+            "erro": "Não encontrado"
+        }), 404
+
+    db.session.delete(usuario)
+    db.session.commit()
+
+    return jsonify({
+        "mensagem": "Excluído"
+    }), 200
+```
+
+==================================================
+12. CÓDIGOS DE STATUS HTTP
+==================================================
+
+200 OK:
+Requisição realizada com sucesso.
+
+201 CREATED:
+Um recurso foi criado com sucesso.
+
+204 NO CONTENT:
+Operação realizada sem conteúdo de resposta.
+
+400 BAD REQUEST:
+Dados enviados incorretamente ou inválidos.
+
+401 UNAUTHORIZED:
+Autenticação ausente ou inválida.
+
+403 FORBIDDEN:
+Usuário autenticado, mas sem permissão.
+
+404 NOT FOUND:
+Recurso ou rota não encontrado.
+
+405 METHOD NOT ALLOWED:
+Método HTTP não permitido naquela rota.
+
+409 CONFLICT:
+Conflito com o estado atual do recurso, como duplicidade.
+
+500 INTERNAL SERVER ERROR:
+Erro interno no servidor.
+
+EXEMPLOS:
+
+```python
+return jsonify({"erro": "Dados inválidos"}), 400
+```
+
+```python
+return jsonify({"mensagem": "Criado"}), 201
+```
+
+```python
+return jsonify({"erro": "Não encontrado"}), 404
+```
+
+DIFERENÇA ENTRE 401 E 403:
+
+401 = Não está autenticado.
+
+403 = Está autenticado, mas não tem autorização.
+
+==================================================
+13. GIT E GITHUB
+==================================================
+
+Git controla versões do código.
+
+GitHub hospeda repositórios Git remotamente.
+
+COMANDOS:
+
+Verificar alterações:
+
+```bash
+git status
+```
+
+Adicionar arquivos:
+
+```bash
+git add .
+```
+
+Criar commit:
+
+```bash
+git commit -m "item 1"
+```
+
+Enviar para GitHub:
+
+```bash
+git push
+```
+
+Baixar alterações do repositório remoto:
+
+```bash
+git pull
+```
+
+Clonar repositório:
+
+```bash
+git clone URL_DO_REPOSITORIO
+```
+
+VERIFICAR REMOTO:
+
+```bash
+git remote -v
+```
+
+FLUXO DE ENTREGA:
+
+1. Modificar o código.
+2. Salvar os arquivos.
+3. git add .
+4. git commit -m "item N"
+5. git push.
+6. Conferir se o commit aparece no GitHub.
+
+IMPORTANTE:
+- add: prepara alterações.
+- commit: registra uma versão local.
+- push: envia commits ao repositório remoto.
+- pull: recebe alterações do remoto.
+- clone: copia um repositório para sua máquina.
+
+==================================================
+14. ERROS COMUNS E SOLUÇÕES
+==================================================
+
+KeyError:
+Tentativa de acessar uma chave inexistente em um dicionário.
+
+SOLUÇÃO:
+```python
+nome = dados.get("nome")
+```
+
+TypeError:
+Operação incompatível entre tipos de dados.
+
+AttributeError:
+Tentativa de acessar atributo ou método inexistente.
+
+NameError:
+Variável não definida.
+
+ImportError:
+Erro ao importar módulo ou objeto.
+
+404:
+Rota ou recurso não encontrado.
+
+405:
+Método HTTP incorreto para a rota.
+
+500:
+Erro interno no servidor. Verifique o terminal e o traceback.
+
+SQLAlchemy:
+- Não esquecer db.session.commit().
+- Verificar se o registro existe antes de atualizar ou excluir.
+- Utilizar first() ou get() para buscar um único registro.
+- Verificar se os dados recebidos são válidos.
+
+FETCH:
+- Conferir se a URL está correta.
+- Conferir o método HTTP.
+- Conferir o Content-Type.
+- Conferir se o Flask está retornando JSON.
+- Verificar response.ok.
+- Não esquecer await response.json().
+
+==================================================
+15. RESUMO GERAL — CONSULTA RÁPIDA
+==================================================
+
+FLASK:
+@app.route() = cria rota.
+render_template() = renderiza HTML.
+request = recebe informações.
+jsonify() = retorna JSON.
+session = mantém dados de sessão.
+redirect() = redireciona.
+url_for() = gera URL.
+
+ORM:
+db.Model = define tabela.
+db.Column() = define coluna.
+db.session.add() = adiciona.
+db.session.commit() = salva.
+db.session.delete() = exclui.
+Model.query.all() = todos.
+Model.query.first() = primeiro.
+Model.query.filter_by() = filtra por igualdade.
+db.session.get() = busca pela chave primária.
+
+TEMPLATES:
+{{ }} = exibe variável.
+{% if %} = condição.
+{% for %} = repetição.
+{% extends %} = herança.
+{% block %} = área substituível.
+
+SESSÕES:
+session["chave"] = salva.
+session.get() = consulta.
+session.pop() = remove uma chave.
+session.clear() = limpa tudo.
+
+REQUEST:
+request.get_json() = recebe JSON.
+request.form = recebe formulário.
+request.args = recebe parâmetros da URL.
+request.method = método utilizado.
+
+JAVASCRIPT:
+fetch() = envia requisição.
+async = permite await.
+await = espera Promise.
+response.json() = interpreta JSON.
+JSON.stringify() = converte objeto em JSON.
+response.ok = verifica sucesso HTTP.
+
+HTTP:
+GET = ler.
+POST = criar.
+PUT = atualizar.
+PATCH = atualizar parcialmente.
+DELETE = excluir.
+
+STATUS:
+200 = sucesso.
+201 = criado.
+204 = sucesso sem conteúdo.
+400 = dados inválidos.
+401 = não autenticado.
+403 = sem permissão.
+404 = não encontrado.
+405 = método não permitido.
+409 = conflito.
+500 = erro interno.
+
+GIT:
+git add .
+git commit -m "item N"
+git push
+
+==================================================
+FIM DO GUIA
+==================================================
+
+DICA FINAL:
+Sempre identifique:
+1. Quem está enviando os dados?
+2. Qual método HTTP está sendo utilizado?
+3. Como Flask recebe os dados?
+4. O que será feito com eles?
+5. Qual resposta e status devem ser devolvidos?
+
+Entender esse fluxo facilita praticamente todas as tarefas de desenvolvimento web com Flask.
